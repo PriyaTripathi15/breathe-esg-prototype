@@ -1,0 +1,10 @@
+[
+  {
+    "trip_id": "TRIP001",
+    "employee": "EMP101",
+    "type": "flight",
+    "from_airport": "DEL",
+    "to_airport": "BLR",
+    "distance_km": 1740
+  }
+]
