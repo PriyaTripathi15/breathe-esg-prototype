@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.contrib.auth.models import User
 from django.utils import timezone
 
 from .models import EmissionRecord, RawRecord, SourceBatch, Tenant
@@ -257,6 +258,42 @@ def _create_batch(tenant, source_type: str, source_system: str, source_format: s
         source_reference=reference,
         notes=notes,
     )
+
+
+def seed_demo_users():
+    demo_accounts = [
+        {
+            "username": "analyst@breatheesg.com",
+            "email": "analyst@breatheesg.com",
+            "password": "BreatheESG2026!",
+            "first_name": "Priya",
+            "last_name": "Analyst",
+        },
+        {
+            "username": "auditor@breatheesg.com",
+            "email": "auditor@breatheesg.com",
+            "password": "BreatheESG2026!",
+            "first_name": "Rohan",
+            "last_name": "Auditor",
+        },
+    ]
+
+    for account in demo_accounts:
+        user, created = User.objects.get_or_create(
+            username=account["username"],
+            defaults={
+                "email": account["email"],
+                "first_name": account["first_name"],
+                "last_name": account["last_name"],
+            },
+        )
+        if created or not user.check_password(account["password"]):
+            user.set_password(account["password"])
+            user.email = account["email"]
+            user.first_name = account["first_name"]
+            user.last_name = account["last_name"]
+            user.is_staff = True
+            user.save()
 
 
 @transaction.atomic

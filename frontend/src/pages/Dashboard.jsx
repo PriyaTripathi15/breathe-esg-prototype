@@ -1,3 +1,4 @@
+import React from 'react'
 import { useEffect, useState } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
@@ -29,13 +30,28 @@ function badgeClass(status) {
 }
 
 async function fetchJson(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    },
-    ...options
-  })
+  const headers = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    ...(options.headers || {})
+  }
+
+  let body = options.body
+  if (body && typeof body === 'object') {
+    body = JSON.stringify(body)
+  }
+
+  const fetchOptions = {
+    method: options.method,
+    headers,
+    signal: options.signal
+  }
+
+  if (body !== undefined) {
+    fetchOptions.body = body
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, fetchOptions)
 
   if (!response.ok) {
     const text = await response.text()
@@ -45,7 +61,32 @@ async function fetchJson(path, options = {}) {
   return response.json()
 }
 
+const demoCredentials = [
+  {
+    username: 'analyst@breatheesg.com',
+    password: 'BreatheESG2026!',
+    role: 'Analyst'
+  },
+  {
+    username: 'auditor@breatheesg.com',
+    password: 'BreatheESG2026!',
+    role: 'Auditor'
+  }
+]
+
 export default function Dashboard() {
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem('breathe-esg-token') || '')
+  const [authUser, setAuthUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authMode, setAuthMode] = useState('login')
+  const [loginUsername, setLoginUsername] = useState(demoCredentials[0].username)
+  const [loginPassword, setLoginPassword] = useState(demoCredentials[0].password)
+  const [registerName, setRegisterName] = useState('')
+  const [registerEmail, setRegisterEmail] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState('')
+  const [registerError, setRegisterError] = useState('')
+  const [loginError, setLoginError] = useState('')
   const [tenants, setTenants] = useState([])
   const [tenantSlug, setTenantSlug] = useState('')
   const [dashboard, setDashboard] = useState(null)
@@ -59,11 +100,56 @@ export default function Dashboard() {
   const [selectedId, setSelectedId] = useState(null)
 
   useEffect(() => {
+    if (!authToken) {
+      setAuthLoading(false)
+      return
+    }
+
+    let active = true
+
+    async function loadSession() {
+      try {
+        const me = await fetchJson('/auth/me/', {
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        })
+        if (active) {
+          setAuthUser(me)
+        }
+      } catch (err) {
+        if (active) {
+          localStorage.removeItem('breathe-esg-token')
+          setAuthToken('')
+        }
+      } finally {
+        if (active) {
+          setAuthLoading(false)
+        }
+      }
+    }
+
+    loadSession()
+
+    return () => {
+      active = false
+    }
+  }, [authToken])
+
+  useEffect(() => {
+    if (!authToken) {
+      return
+    }
+
     let active = true
 
     async function loadTenants() {
       try {
-        const data = await fetchJson('/tenants/')
+        const data = await fetchJson('/tenants/', {
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        })
         if (!active) {
           return
         }
@@ -81,10 +167,10 @@ export default function Dashboard() {
     return () => {
       active = false
     }
-  }, [])
+  }, [authToken])
 
   useEffect(() => {
-    if (!tenantSlug) {
+    if (!authToken || !tenantSlug) {
       return
     }
 
@@ -108,8 +194,18 @@ export default function Dashboard() {
 
       try {
         const [dashboardResponse, recordsResponse] = await Promise.all([
-          fetchJson(`/dashboard/?tenant=${encodeURIComponent(tenantSlug)}`, { signal: controller.signal }),
-          fetchJson(`/records/?${params.toString()}`, { signal: controller.signal })
+          fetchJson(`/dashboard/?tenant=${encodeURIComponent(tenantSlug)}`, {
+            signal: controller.signal,
+            headers: {
+              Authorization: `Bearer ${authToken}`
+            }
+          }),
+          fetchJson(`/records/?${params.toString()}`, {
+            signal: controller.signal,
+            headers: {
+              Authorization: `Bearer ${authToken}`
+            }
+          })
         ])
 
         if (!active) {
@@ -136,9 +232,67 @@ export default function Dashboard() {
       active = false
       controller.abort()
     }
-  }, [tenantSlug, statusFilter, sourceFilter, search])
+  }, [authToken, tenantSlug, statusFilter, sourceFilter, search])
 
   const selectedRecord = records.find((record) => record.id === selectedId) || dashboard?.latest_records?.[0] || dashboard?.queue?.[0] || null
+
+  async function login(event) {
+    event.preventDefault()
+    setLoginError('')
+
+    try {
+      const response = await fetchJson('/auth/login/', {
+        method: 'POST',
+        body: {
+          username: loginUsername,
+          password: loginPassword
+        }
+      })
+
+      localStorage.setItem('breathe-esg-token', response.token)
+      setAuthToken(response.token)
+      setAuthUser(response.user)
+    } catch (err) {
+      setLoginError('Use one of the seeded demo accounts shown below.')
+    }
+  }
+
+  async function register(event) {
+    event.preventDefault()
+    setRegisterError('')
+
+    if (registerPassword !== registerConfirmPassword) {
+      setRegisterError('Passwords do not match.')
+      return
+    }
+
+    try {
+      const response = await fetchJson('/auth/register/', {
+        method: 'POST',
+        body: {
+          username: registerEmail,
+          email: registerEmail,
+          full_name: registerName,
+          password: registerPassword
+        }
+      })
+
+      localStorage.setItem('breathe-esg-token', response.token)
+      setAuthToken(response.token)
+      setAuthUser(response.user)
+    } catch (err) {
+      setRegisterError('Could not create account. Try a different email address.')
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('breathe-esg-token')
+    setAuthToken('')
+    setAuthUser(null)
+    setDashboard(null)
+    setRecords([])
+    setSelectedId(null)
+  }
 
   async function updateRecord(recordId, reviewStatus) {
     setSavingId(recordId)
@@ -147,10 +301,13 @@ export default function Dashboard() {
     try {
       await fetchJson(`/records/${recordId}/`, {
         method: 'PATCH',
-        body: JSON.stringify({
+        headers: {
+          Authorization: `Bearer ${authToken}`
+        },
+        body: {
           review_status: reviewStatus,
           edited_by_name: 'Analyst'
-        })
+        }
       })
 
       const params = new URLSearchParams({ tenant: tenantSlug })
@@ -165,8 +322,16 @@ export default function Dashboard() {
       }
 
       const [dashboardResponse, recordsResponse] = await Promise.all([
-        fetchJson(`/dashboard/?tenant=${encodeURIComponent(tenantSlug)}`),
-        fetchJson(`/records/?${params.toString()}`)
+        fetchJson(`/dashboard/?tenant=${encodeURIComponent(tenantSlug)}`, {
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        }),
+        fetchJson(`/records/?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        })
       ])
 
       setDashboard(dashboardResponse)
@@ -177,6 +342,100 @@ export default function Dashboard() {
     } finally {
       setSavingId(null)
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="app-shell auth-shell">
+        <main className="auth-card panel">
+          <div className="empty-state">Loading secure demo session...</div>
+        </main>
+      </div>
+    )
+  }
+
+  if (!authToken || !authUser) {
+    return (
+      <div className="app-shell auth-shell">
+        <div className="background-orb orb-a" />
+        <div className="background-orb orb-b" />
+
+        <main className="auth-card panel">
+          <p className="eyebrow">Breathe ESG secure demo</p>
+          <h1>{authMode === 'login' ? 'Sign in to review normalized emissions data.' : 'Create your account to start reviewing data.'}</h1>
+          <p className="hero-copy">
+            {authMode === 'login'
+              ? 'You can use the seeded demo users below, or switch to register a new account.'
+              : 'Register a new account, then you will be signed in automatically.'}
+          </p>
+
+          <div className="auth-switch">
+            <button type="button" className={authMode === 'login' ? 'primary' : 'secondary'} onClick={() => setAuthMode('login')}>
+              Sign in
+            </button>
+            <button type="button" className={authMode === 'register' ? 'primary' : 'secondary'} onClick={() => setAuthMode('register')}>
+              Register
+            </button>
+          </div>
+
+          {authMode === 'login' ? (
+            <>
+              <form className="login-form" onSubmit={login}>
+                <label>
+                  <span>Email</span>
+                  <input value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} autoComplete="username" />
+                </label>
+                <label>
+                  <span>Password</span>
+                  <input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} autoComplete="current-password" />
+                </label>
+                {loginError ? <div className="alert">{loginError}</div> : null}
+                <button type="submit" className="primary full-width">Sign in</button>
+              </form>
+
+              <div className="demo-credential-grid">
+                {demoCredentials.map((credential) => (
+                  <button
+                    key={credential.username}
+                    type="button"
+                    className="credential-card"
+                    onClick={() => {
+                      setLoginUsername(credential.username)
+                      setLoginPassword(credential.password)
+                    }}
+                  >
+                    <strong>{credential.role}</strong>
+                    <span>{credential.username}</span>
+                    <small>{credential.password}</small>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <form className="login-form" onSubmit={register}>
+              <label>
+                <span>Full name</span>
+                <input value={registerName} onChange={(event) => setRegisterName(event.target.value)} autoComplete="name" />
+              </label>
+              <label>
+                <span>Email</span>
+                <input value={registerEmail} onChange={(event) => setRegisterEmail(event.target.value)} autoComplete="username" />
+              </label>
+              <label>
+                <span>Password</span>
+                <input type="password" value={registerPassword} onChange={(event) => setRegisterPassword(event.target.value)} autoComplete="new-password" />
+              </label>
+              <label>
+                <span>Confirm password</span>
+                <input type="password" value={registerConfirmPassword} onChange={(event) => setRegisterConfirmPassword(event.target.value)} autoComplete="new-password" />
+              </label>
+              {registerError ? <div className="alert">{registerError}</div> : null}
+              <button type="submit" className="primary full-width">Create account</button>
+            </form>
+          )}
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -205,9 +464,11 @@ export default function Dashboard() {
             </select>
 
             <div className="hero-note">
+              <span>{authUser?.full_name || authUser?.username}</span>
               <span>{dashboard?.tenant?.name || 'Loading tenant...'}</span>
               <span>{dashboard ? `${formatNumber(dashboard.totals.records)} records loaded` : 'Waiting for data'}</span>
             </div>
+            <button type="button" className="ghost" onClick={logout}>Log out</button>
           </div>
         </header>
 

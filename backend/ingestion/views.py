@@ -1,11 +1,104 @@
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from django.db.models import Count, Sum
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .auth import create_demo_token, get_demo_user_from_request
 from .models import EmissionRecord, Tenant
 from .serializers import EmissionRecordSerializer, TenantSerializer
+
+
+def require_demo_user(request):
+    user = get_demo_user_from_request(request)
+    if user is None:
+        return None, Response({"detail": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+    return user, None
+
+
+class LoginAPIView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        username = (request.data.get("username") or "").strip()
+        password = request.data.get("password") or ""
+        user = authenticate(request, username=username, password=password)
+        if user is None:
+            return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        token = create_demo_token(user)
+        return Response(
+            {
+                "token": token,
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "full_name": user.get_full_name(),
+                },
+            }
+        )
+
+
+class RegisterAPIView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        username = (request.data.get("username") or request.data.get("email") or "").strip()
+        email = (request.data.get("email") or username).strip()
+        password = request.data.get("password") or ""
+        full_name = (request.data.get("full_name") or "").strip()
+
+        if not username:
+            return Response({"detail": "Username is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not password:
+            return Response({"detail": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(username=username).exists():
+            return Response({"detail": "A user with this username already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(username=username, email=email, password=password)
+        if full_name:
+            first_name, _, last_name = full_name.partition(" ")
+            user.first_name = first_name
+            user.last_name = last_name
+            user.save(update_fields=["first_name", "last_name"])
+
+        token = create_demo_token(user)
+        return Response(
+            {
+                "token": token,
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "full_name": user.get_full_name() or user.username,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class MeAPIView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        user = get_demo_user_from_request(request)
+        if user is None:
+            return Response({"detail": "Unauthorized."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        return Response(
+            {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.get_full_name(),
+            }
+        )
 
 
 def resolve_tenant(request):
@@ -18,12 +111,18 @@ def resolve_tenant(request):
 
 class TenantListAPIView(APIView):
     def get(self, request):
+        _user, error = require_demo_user(request)
+        if error:
+            return error
         tenants = Tenant.objects.order_by("name")
         return Response(TenantSerializer(tenants, many=True).data)
 
 
 class DashboardAPIView(APIView):
     def get(self, request):
+        _user, error = require_demo_user(request)
+        if error:
+            return error
         tenant = resolve_tenant(request)
         if tenant is None:
             return Response({"detail": "No tenants available."}, status=status.HTTP_404_NOT_FOUND)
@@ -60,6 +159,9 @@ class DashboardAPIView(APIView):
 
 class RecordListAPIView(APIView):
     def get(self, request):
+        _user, error = require_demo_user(request)
+        if error:
+            return error
         tenant = resolve_tenant(request)
         if tenant is None:
             return Response({"results": []})
@@ -86,6 +188,13 @@ class RecordListAPIView(APIView):
 class RecordDetailAPIView(generics.RetrieveUpdateAPIView):
     queryset = EmissionRecord.objects.select_related("raw_record", "tenant", "batch")
     serializer_class = EmissionRecordSerializer
+
+    def dispatch(self, request, *args, **kwargs):
+        user, error = require_demo_user(request)
+        if error:
+            return error
+        self.demo_user = user
+        return super().dispatch(request, *args, **kwargs)
 
     def patch(self, request, *args, **kwargs):
         instance = self.get_object()
