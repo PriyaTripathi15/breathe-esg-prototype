@@ -19,8 +19,9 @@ services:
           name: breathe-esg-db
           property: connectionString
 
-  - type: static
+  - type: web
     name: breathe-esg-web
+    runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
