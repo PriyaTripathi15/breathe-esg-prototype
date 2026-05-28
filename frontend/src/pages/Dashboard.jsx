@@ -1,5 +1,6 @@
 import React from 'react'
 import { useEffect, useState } from 'react'
+import heroDashboardImage from '../assets/image.png'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
 
@@ -61,26 +62,15 @@ async function fetchJson(path, options = {}) {
   return response.json()
 }
 
-const demoCredentials = [
-  {
-    username: 'analyst@breatheesg.com',
-    password: 'BreatheESG2026!',
-    role: 'Analyst'
-  },
-  {
-    username: 'auditor@breatheesg.com',
-    password: 'BreatheESG2026!',
-    role: 'Auditor'
-  }
-]
+// Demo credentials removed so users can register and sign in.
 
 export default function Dashboard() {
   const [authToken, setAuthToken] = useState(() => localStorage.getItem('breathe-esg-token') || '')
   const [authUser, setAuthUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authMode, setAuthMode] = useState('login')
-  const [loginUsername, setLoginUsername] = useState(demoCredentials[0].username)
-  const [loginPassword, setLoginPassword] = useState(demoCredentials[0].password)
+  const [loginUsername, setLoginUsername] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
   const [registerName, setRegisterName] = useState('')
   const [registerEmail, setRegisterEmail] = useState('')
   const [registerPassword, setRegisterPassword] = useState('')
@@ -97,7 +87,25 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [hasNextPage, setHasNextPage] = useState(false)
+  const [hasPreviousPage, setHasPreviousPage] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
+
+  function buildRecordsParams() {
+    const params = new URLSearchParams({ tenant: tenantSlug, page: String(currentPage) })
+    if (statusFilter !== 'all') {
+      params.set('status', statusFilter)
+    }
+    if (sourceFilter !== 'all') {
+      params.set('source_type', sourceFilter)
+    }
+    if (search.trim()) {
+      params.set('search', search.trim())
+    }
+    return params
+  }
 
   useEffect(() => {
     if (!authToken) {
@@ -181,16 +189,7 @@ export default function Dashboard() {
       setLoading(true)
       setError('')
 
-      const params = new URLSearchParams({ tenant: tenantSlug })
-      if (statusFilter !== 'all') {
-        params.set('status', statusFilter)
-      }
-      if (sourceFilter !== 'all') {
-        params.set('source_type', sourceFilter)
-      }
-      if (search.trim()) {
-        params.set('search', search.trim())
-      }
+      const params = buildRecordsParams()
 
       try {
         const [dashboardResponse, recordsResponse] = await Promise.all([
@@ -214,6 +213,9 @@ export default function Dashboard() {
 
         setDashboard(dashboardResponse)
         setRecords(recordsResponse.results || [])
+        setTotalRecords(recordsResponse.count || 0)
+        setHasNextPage(Boolean(recordsResponse.next))
+        setHasPreviousPage(Boolean(recordsResponse.previous))
         setSelectedId((current) => current || recordsResponse.results?.[0]?.id || null)
       } catch (err) {
         if (active && err.name !== 'AbortError') {
@@ -232,7 +234,11 @@ export default function Dashboard() {
       active = false
       controller.abort()
     }
-  }, [authToken, tenantSlug, statusFilter, sourceFilter, search])
+  }, [authToken, tenantSlug, statusFilter, sourceFilter, search, currentPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [statusFilter, sourceFilter, search, tenantSlug])
 
   const selectedRecord = records.find((record) => record.id === selectedId) || dashboard?.latest_records?.[0] || dashboard?.queue?.[0] || null
 
@@ -253,7 +259,7 @@ export default function Dashboard() {
       setAuthToken(response.token)
       setAuthUser(response.user)
     } catch (err) {
-      setLoginError('Use one of the seeded demo accounts shown below.')
+      setLoginError('Invalid username or password.')
     }
   }
 
@@ -310,16 +316,7 @@ export default function Dashboard() {
         }
       })
 
-      const params = new URLSearchParams({ tenant: tenantSlug })
-      if (statusFilter !== 'all') {
-        params.set('status', statusFilter)
-      }
-      if (sourceFilter !== 'all') {
-        params.set('source_type', sourceFilter)
-      }
-      if (search.trim()) {
-        params.set('search', search.trim())
-      }
+      const params = buildRecordsParams()
 
       const [dashboardResponse, recordsResponse] = await Promise.all([
         fetchJson(`/dashboard/?tenant=${encodeURIComponent(tenantSlug)}`, {
@@ -336,6 +333,9 @@ export default function Dashboard() {
 
       setDashboard(dashboardResponse)
       setRecords(recordsResponse.results || [])
+      setTotalRecords(recordsResponse.count || 0)
+      setHasNextPage(Boolean(recordsResponse.next))
+      setHasPreviousPage(Boolean(recordsResponse.previous))
       setSelectedId(recordId)
     } catch (err) {
       setError('Could not save the review decision.')
@@ -363,11 +363,16 @@ export default function Dashboard() {
         <main className="auth-card panel">
           <p className="eyebrow">Breathe ESG secure demo</p>
           <h1>{authMode === 'login' ? 'Sign in to review normalized emissions data.' : 'Create your account to start reviewing data.'}</h1>
-          <p className="hero-copy">
+            <p className="hero-copy">
             {authMode === 'login'
-              ? 'You can use the seeded demo users below, or switch to register a new account.'
+              ? 'Sign in with your account or switch to register a new account.'
               : 'Register a new account, then you will be signed in automatically.'}
           </p>
+
+          <figure className="auth-image-card">
+            <img src={heroDashboardImage} alt="Dashboard illustration preview for Breathe ESG review center" />
+            <figcaption className="auth-image-caption">Track, review, and approve from one workspace</figcaption>
+          </figure>
 
           <div className="auth-switch">
             <button type="button" className={authMode === 'login' ? 'primary' : 'secondary'} onClick={() => setAuthMode('login')}>
@@ -393,23 +398,7 @@ export default function Dashboard() {
                 <button type="submit" className="primary full-width">Sign in</button>
               </form>
 
-              <div className="demo-credential-grid">
-                {demoCredentials.map((credential) => (
-                  <button
-                    key={credential.username}
-                    type="button"
-                    className="credential-card"
-                    onClick={() => {
-                      setLoginUsername(credential.username)
-                      setLoginPassword(credential.password)
-                    }}
-                  >
-                    <strong>{credential.role}</strong>
-                    <span>{credential.username}</span>
-                    <small>{credential.password}</small>
-                  </button>
-                ))}
-              </div>
+              {/* Demo credentials removed */}
             </>
           ) : (
             <form className="login-form" onSubmit={register}>
@@ -445,13 +434,18 @@ export default function Dashboard() {
 
       <main className="dashboard">
         <header className="hero">
-          <div>
+          <div className="hero-copy-block">
             <p className="eyebrow">Breathe ESG review center</p>
             <h1>Normalize messy source data, then let analysts sign off before audit.</h1>
             <p className="hero-copy">
               This prototype handles SAP exports, utility portal data, and Concur-style travel feeds with one review queue and a linked audit trail.
             </p>
           </div>
+
+          <figure className="hero-image-card">
+            <img src={heroDashboardImage} alt="Illustration of ESG analytics dashboard cards and trend lines" />
+            <figcaption>Unified carbon data review snapshot</figcaption>
+          </figure>
 
           <div className="hero-meta">
             <label className="field-label" htmlFor="tenant-select">Tenant</label>
@@ -562,6 +556,28 @@ export default function Dashboard() {
                   </button>
                 ))}
               </div>
+
+              {!loading && records.length > 0 ? (
+                <div className="pagination-row" role="navigation" aria-label="Queue pagination">
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={!hasPreviousPage}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  >
+                    Previous
+                  </button>
+                  <span>Page {currentPage} · {formatNumber(totalRecords)} records</span>
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={!hasNextPage}
+                    onClick={() => setCurrentPage((page) => page + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : null}
             </section>
 
             <section className="panel">

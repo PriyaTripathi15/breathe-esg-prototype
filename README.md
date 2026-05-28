@@ -43,7 +43,8 @@ npm run dev
 Open the frontend address shown by Vite (usually http://localhost:5173) and the Django API at http://localhost:8000.
 
 **Notes & troubleshooting**
-- If Django errors about missing packages (for example `dj_database_url`), ensure you ran `pip install -r requirements.txt` inside the activated virtualenv.
+- The backend uses SQLite (`backend/db.sqlite3`) by default.
+- If Django errors about missing packages, ensure you ran `pip install -r requirements.txt` inside the activated virtualenv.
 - If you already have a `.venv` at the repo root, activate it instead of creating a new one.
 - To create an admin user:
 

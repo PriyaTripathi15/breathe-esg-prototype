@@ -1,0 +1,28 @@
+<svg width="900" height="540" viewBox="0 0 900 540" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ESG dashboard illustration</title>
+  <desc id="desc">Abstract blue and white dashboard cards with chart lines.</desc>
+  <rect width="900" height="540" rx="36" fill="#EDF5FF"/>
+  <circle cx="120" cy="86" r="70" fill="#D6E8FF"/>
+  <circle cx="808" cy="452" r="94" fill="#DCEBFF"/>
+  <rect x="74" y="94" width="752" height="354" rx="26" fill="#FFFFFF" stroke="#C9DEFB" stroke-width="3"/>
+
+  <rect x="110" y="130" width="230" height="108" rx="16" fill="#F3F9FF"/>
+  <rect x="360" y="130" width="230" height="108" rx="16" fill="#F3F9FF"/>
+  <rect x="610" y="130" width="180" height="108" rx="16" fill="#F3F9FF"/>
+
+  <rect x="120" y="146" width="92" height="12" rx="6" fill="#C4DCF9"/>
+  <rect x="120" y="168" width="70" height="30" rx="8" fill="#2C79D8"/>
+  <rect x="370" y="146" width="86" height="12" rx="6" fill="#C4DCF9"/>
+  <rect x="370" y="168" width="76" height="30" rx="8" fill="#2C79D8"/>
+  <rect x="620" y="146" width="76" height="12" rx="6" fill="#C4DCF9"/>
+  <rect x="620" y="168" width="62" height="30" rx="8" fill="#2C79D8"/>
+
+  <rect x="110" y="258" width="680" height="154" rx="18" fill="#F6FAFF"/>
+  <path d="M138 362L216 338L288 348L368 304L450 316L528 282L606 300L688 264L758 286" stroke="#2C79D8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M138 384L218 374L296 350L370 360L450 330L532 344L608 322L690 336L758 318" stroke="#73A9E8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="138" cy="362" r="8" fill="#2C79D8"/>
+  <circle cx="368" cy="304" r="8" fill="#2C79D8"/>
+  <circle cx="528" cy="282" r="8" fill="#2C79D8"/>
+  <circle cx="688" cy="264" r="8" fill="#2C79D8"/>
+</svg>
