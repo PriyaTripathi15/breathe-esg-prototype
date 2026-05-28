@@ -298,6 +298,9 @@ def seed_demo_users():
 
 @transaction.atomic
 def seed_demo_data():
+    # Ensure demo user accounts exist regardless of tenant state
+    seed_demo_users()
+
     if Tenant.objects.exists():
         return
 

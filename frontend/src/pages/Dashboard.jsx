@@ -68,6 +68,7 @@ export default function Dashboard() {
   const [authToken, setAuthToken] = useState(() => localStorage.getItem('breathe-esg-token') || '')
   const [authUser, setAuthUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false)
   const [authMode, setAuthMode] = useState('login')
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
@@ -143,6 +144,36 @@ export default function Dashboard() {
       active = false
     }
   }, [authToken])
+
+  // Attempt a silent demo login if no token is present
+  useEffect(() => {
+    if (authToken || autoLoginAttempted) return
+    setAutoLoginAttempted(true)
+
+    let active = true
+    ;(async function tryDemoLogin() {
+      try {
+        const response = await fetchJson('/auth/login/', {
+          method: 'POST',
+          body: {
+            username: 'analyst@breatheesg.com',
+            password: 'BreatheESG2026!'
+          }
+        })
+
+        if (!active) return
+        localStorage.setItem('breathe-esg-token', response.token)
+        setAuthToken(response.token)
+        setAuthUser(response.user)
+      } catch (err) {
+        // silent fail — user can still sign in manually
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [authToken, autoLoginAttempted])
 
   useEffect(() => {
     if (!authToken) {
