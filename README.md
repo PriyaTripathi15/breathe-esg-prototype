@@ -12,7 +12,7 @@ The project is designed as a realistic ESG review workflow:
 
 ## Tech Stack
 
-- Backend: Django, Django REST Framework, SQLite
+- Backend: Django, Django REST Framework, SQLite locally, Postgres in production
 - Frontend: React, Vite
 - API style: JSON over `/api/`
 
@@ -125,6 +125,7 @@ If unset, it defaults to `http://127.0.0.1:8000/api`.
 - The demo uses SQLite by default for simplicity.
 - `backend/ingestion/signals.py` seeds demo data after migrations run.
 - `render.yaml` is included for deployment configuration.
+- For a free setup, deploy `backend/` on Render, `frontend/` on Vercel, and use Supabase Postgres for `DATABASE_URL`.
 
 ## Troubleshooting
 

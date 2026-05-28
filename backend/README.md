@@ -12,3 +12,4 @@ python manage.py runserver
 - The backend serves JSON only.
 - Default API base: `http://127.0.0.1:8000/api`
 - Database uses `DATABASE_URL` when provided, with local SQLite as a fallback.
+- A `Procfile` is included for process-based deploy targets.
